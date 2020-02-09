@@ -107,8 +107,11 @@ class OpenSSLCryptoBase(object):
         if not self._ctx:
             raise Exception('can not create cipher context')
 
-        self.encrypt_once = self.update
-        self.decrypt_once = self.update
+    def encrypt_once(self, data):
+        return self.update(data)
+
+    def decrypt_once(self, data):
+        return self.update(data)
 
     def update(self, data):
         """
@@ -136,6 +139,7 @@ class OpenSSLCryptoBase(object):
         if self._ctx:
             ctx_cleanup(self._ctx)
             libcrypto.EVP_CIPHER_CTX_free(self._ctx)
+            self._ctx = None
 
 
 class OpenSSLAeadCrypto(OpenSSLCryptoBase, AeadCryptoBase):
@@ -267,6 +271,12 @@ class OpenSSLAeadCrypto(OpenSSLCryptoBase, AeadCryptoBase):
         self.cipher_ctx_init()
         return plaintext
 
+    def encrypt_once(self, data):
+        return self.aead_encrypt(data)
+
+    def decrypt_once(self, data):
+        return self.aead_decrypt(data)
+
 
 class OpenSSLStreamCrypto(OpenSSLCryptoBase):
     """
@@ -281,8 +291,12 @@ class OpenSSLStreamCrypto(OpenSSLCryptoBase):
         if not r:
             self.clean()
             raise Exception('can not initialize cipher context')
-        self.encrypt = self.update
-        self.decrypt = self.update
+
+    def encrypt(self, data):
+        return self.update(data)
+
+    def decrypt(self, data):
+        return self.update(data)
 
 
 ciphers = {
@@ -332,6 +346,8 @@ def run_method(method):
 
 def run_aead_method(method, key_len=16):
 
+    if not loaded:
+        load_openssl(None)
     print(method, ': [payload][tag]', key_len)
     cipher = libcrypto.EVP_get_cipherbyname(common.to_bytes(method))
     if not cipher:
@@ -348,6 +364,8 @@ def run_aead_method(method, key_len=16):
 
 def run_aead_method_chunk(method, key_len=16):
 
+    if not loaded:
+        load_openssl(None)
     print(method, ': chunk([size][tag][payload][tag]', key_len)
     cipher = libcrypto.EVP_get_cipherbyname(common.to_bytes(method))
     if not cipher:
